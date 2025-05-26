@@ -1,39 +1,36 @@
-import React, { useContext } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+require('dotenv').config();
 
-const Navbar = () => {
-  const { user, logout } = useContext(AuthContext);
-  const navigate = useNavigate();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+const authRoutes = require('./routes/authRoutes');
+const jobRoutes = require('./routes/jobRoutes');
 
-  return (
-    <nav className="bg-gray-800 p-4 text-white flex justify-between items-center">
-      <div className="font-bold text-xl">
-        <Link to="/">Job Portal</Link>
-      </div>
-      <div className="space-x-4">
-        {!user ? (
-          <>
-            <Link to="/login" className="hover:underline">Login</Link>
-            <Link to="/register" className="hover:underline">Register</Link>
-          </>
-        ) : (
-          <>
-            {user.role === 'admin' && (
-              <Link to="/postjob" className="hover:underline">Post Job</Link>
-            )}
-            <span className="text-sm">Logged in as <strong>{user.role}</strong></span>
-            <button onClick={handleLogout} className="hover:underline">Logout</button>
-          </>
-        )}
-      </div>
-    </nav>
-  );
-};
+const app = express();
 
-export default Navbar;
+app.use(express.json());
+app.use(cors({
+  origin: ['http://localhost:5173', 'https://meeyal-frontend-react.vercel.app'],
+  credentials: true
+}));
+
+const PORT = process.env.PORT || 5000;
+const MONGO_URI = process.env.MONGO_URI;
+
+mongoose.connect(MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => console.log('✅ MongoDB connected'))
+.catch(err => {
+  console.error('❌ MongoDB connection error:', err.message);
+  process.exit(1);
+});
+
+app.use('/api', authRoutes);
+app.use('/api/jobs/', jobRoutes);
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
