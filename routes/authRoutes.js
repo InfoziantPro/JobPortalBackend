@@ -59,7 +59,7 @@ router.post('/login', async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000
     });
 
-    res.json({ message: 'Login successful', role: user.role, token }); // Include token for Hoppscotch/Postman
+    res.json({ message: 'Login successful', role: user.role, token });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error. Please try again later.' });

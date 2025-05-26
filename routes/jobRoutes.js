@@ -6,17 +6,13 @@ const Job = require('../models/jobs');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Admin Auth Middleware (supports both cookie and Bearer token)
-const authAdmin = async (req, res, next) => {
+// Middleware: Authenticate user from cookie or Bearer token
+const authUser = async (req, res, next) => {
   let token = null;
 
-  // Try from cookie
   if (req.cookies?.token) {
     token = req.cookies.token;
-  }
-
-  // Try from header
-  if (!token && req.header('Authorization')) {
+  } else if (req.header('Authorization')) {
     token = req.header('Authorization').replace('Bearer ', '');
   }
 
@@ -27,15 +23,24 @@ const authAdmin = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(decoded.id);
-    if (!user || user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied. Admins only.' });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid token user.' });
     }
-
     req.user = user;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token.' });
   }
+};
+
+// Middleware: Authenticate admin user
+const authAdmin = async (req, res, next) => {
+  await authUser(req, res, async () => {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admins only.' });
+    }
+    next();
+  });
 };
 
 // Admin: Add new job
@@ -65,14 +70,23 @@ router.post('/postjob', authAdmin, async (req, res) => {
   }
 });
 
-// (Optional) Admin: Get all jobs
-router.get('/all', async (req, res) => {
+// Protected route: Get all jobs - only authenticated users
+router.get('/all', authUser, async (req, res) => {
   try {
     const jobs = await Job.find().sort({ postedAt: -1 });
     res.json({ jobs });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch jobs' });
+  }
+});
+
+router.get('/api/me', (req, res) => {
+  // assuming you are using cookie-parser and session/JWT verification
+  if (req.user) {
+    res.json({ user: { name: req.user.name, role: req.user.role } });
+  } else {
+    res.status(401).json({ error: 'Not authenticated' });
   }
 });
 
