@@ -66,11 +66,12 @@ router.post('/postjob', authAdmin, async (req, res) => {
 });
 
 // (Optional) Admin: Get all jobs
-router.get('/all', authAdmin, async (req, res) => {
+router.get('/all', async (req, res) => {
   try {
-    const jobs = await Job.find().populate('postedBy', 'email');
-    res.json(jobs);
+    const jobs = await Job.find().sort({ postedAt: -1 });
+    res.json({ jobs });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Failed to fetch jobs' });
   }
 });
