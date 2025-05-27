@@ -1,93 +1,66 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
 const Job = require('../models/jobs');
+const { authUser, authRole } = require('../middleware/auth');
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET;
 
-// Middleware: Authenticate user from cookie or Bearer token
-const authUser = async (req, res, next) => {
-  let token = null;
-
-  if (req.cookies?.token) {
-    token = req.cookies.token;
-  } else if (req.header('Authorization')) {
-    token = req.header('Authorization').replace('Bearer ', '');
-  }
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access denied. No token provided.' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.id);
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid token user.' });
-    }
-    req.user = user;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token.' });
-  }
-};
-
-// Middleware: Authenticate admin user
-const authAdmin = async (req, res, next) => {
-  await authUser(req, res, async () => {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied. Admins only.' });
-    }
-    next();
-  });
-};
-
-// Admin: Add new job
-router.post('/postjob', authAdmin, async (req, res) => {
+// Post a job (Admin/SuperAdmin only)
+router.post('/postjob', authRole(['admin', 'superadmin']), async (req, res) => {
   try {
     const { title, description, company, location, salaryRange, jobType } = req.body;
-
-    if (!title || !description || !company) {
-      return res.status(400).json({ error: 'Title, description, and company are required.' });
-    }
 
     const job = new Job({
       title,
       description,
       company,
-      location: location || 'Remote',
+      location,
       salaryRange,
-      jobType: jobType || 'Full-time',
+      jobType,
       postedBy: req.user._id,
     });
 
     await job.save();
     res.status(201).json({ message: 'Job posted successfully', job });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error. Please try again later.' });
+    console.error('Post Job Error:', err.message);
+    res.status(500).json({ error: 'Server error while posting job.' });
   }
 });
 
-// Protected route: Get all jobs - only authenticated users
+// Apply to a job (User only)
+router.post('/:id/apply', authUser, async (req, res) => {
+  try {
+    const job = await Job.findById(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    if (job.applicants.includes(req.user._id)) {
+      return res.status(400).json({ error: 'Already applied' });
+    }
+
+    job.applicants.push(req.user._id);
+    await job.save();
+
+    res.json({ message: 'Applied successfully' });
+  } catch (err) {
+    console.error('Apply Error:', err.message);
+    res.status(500).json({ error: 'Server error while applying' });
+  }
+});
+
+// Get all jobs
 router.get('/all', authUser, async (req, res) => {
   try {
-    const jobs = await Job.find().sort({ postedAt: -1 });
+    const jobs = await Job.find({ isActive: true }).populate('postedBy', 'name email');
     res.json({ jobs });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch jobs' });
+    res.status(500).json({ error: 'Failed to load jobs' });
   }
 });
 
-router.get('/api/me', (req, res) => {
-  // assuming you are using cookie-parser and session/JWT verification
-  if (req.user) {
-    res.json({ user: { name: req.user.name, role: req.user.role } });
-  } else {
-    res.status(401).json({ error: 'Not authenticated' });
-  }
+// Get current user
+router.get('/me', authUser, (req, res) => {
+  const { name, email, role } = req.user;
+  res.json({ user: { name, email, role } });
 });
 
 module.exports = router;
