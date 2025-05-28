@@ -38,15 +38,35 @@ router.get('/verify-email/:token', async (req, res) => {
 router.post('/register/company', async (req, res) => {
   try {
     const { name, email, password } = req.body;
-    if (!name || !email || !password) return res.status(400).json({ error: 'All fields are required' });
+
+    if (!name || !email || !password)
+      return res.status(400).json({ error: 'All fields are required' });
 
     const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ error: 'Email already registered' });
+    if (existingUser)
+      return res.status(400).json({ error: 'Email already registered' });
 
-    const newUser = new User({ name, email, password, role: 'admin', status: 'pending' });
+    const newUser = new User({
+      name,
+      email,
+      password,
+      role: 'admin', // still company, but will be approved by superadmin
+      status: 'pending',
+      emailVerified: false,
+    });
+
     await newUser.save();
 
-    res.status(201).json({ message: 'Company registered successfully and is pending Super Admin approval.' });
+    // Generate email verification token
+    const emailToken = jwt.sign({ userId: newUser._id }, JWT_EMAIL_SECRET, { expiresIn: '1d' });
+
+    // Send the verification email
+    await sendEmailVerification(newUser, emailToken);
+
+    res.status(201).json({
+      message: 'Company registered successfully. Please verify your email.',
+      emailVerificationLink: `http://localhost:5000/api/verify-email/${emailToken}`,
+    });
   } catch (err) {
     console.error('Company Register Error:', err);
     res.status(500).json({ error: 'Server error during registration.' });
