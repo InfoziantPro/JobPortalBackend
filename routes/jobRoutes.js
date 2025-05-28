@@ -5,7 +5,7 @@ const { authUser, authRole } = require('../middleware/auth');
 const router = express.Router();
 
 // Post a job (Admin/SuperAdmin only)
-router.post('/postjob', authRole(['admin', 'superadmin']), async (req, res) => {
+router.post('/postjob', authUser, authRole(['admin', 'superadmin']), async (req, res) => {
   try {
     const { title, description, company, location, salaryRange, jobType } = req.body;
 
