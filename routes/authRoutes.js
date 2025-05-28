@@ -14,25 +14,24 @@ const sendEmailVerification = async (user, token) => {
 };
 
 // Candidate email verification endpoint
+// Backend: /routes/auth.js
 router.get('/verify-email/:token', async (req, res) => {
   try {
     const { token } = req.params;
-    const decoded = jwt.verify(token, JWT_EMAIL_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_EMAIL_SECRET);
+
     const user = await User.findById(decoded.userId);
+    if (!user) return res.redirect('http://localhost:5173/verify-failed');
 
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    // Remove role check; all users require verification
     user.emailVerified = true;
     await user.save();
 
-    res.json({ message: 'Email verified successfully, you can now login.' });
+    return res.redirect('http://localhost:5173/verify-success'); // redirect to frontend success page
   } catch (err) {
     console.error('Email Verification Error:', err);
-    res.status(400).json({ error: 'Invalid or expired verification token.' });
+    return res.redirect('http://localhost:5173/verify-failed');
   }
 });
-
 
 // Company (Admin) registration
 router.post('/register/company', async (req, res) => {
