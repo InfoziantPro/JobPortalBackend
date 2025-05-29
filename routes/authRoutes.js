@@ -372,5 +372,4 @@ router.get('/all', authUser, authRole(['superadmin']), async (req, res) => {
   }
 });
 
-
 module.exports = router;
