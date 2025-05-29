@@ -219,25 +219,6 @@ router.post('/approve/company/:companyId', authUser, authRole(['superadmin']), a
   }
 });
 
-// Company: Approve Employee
-router.post('/approve/employee/:employeeId', authUser, authRole(['admin']), async (req, res) => {
-  try {
-    const employee = await User.findById(req.params.employeeId);
-    if (!employee || employee.role !== 'employee' || String(employee.companyId) !== String(req.user._id)) {
-      return res.status(404).json({ error: 'Employee not found or not under your company' });
-    }
-
-    employee.status = 'approved';
-    employee.approvedBy = req.user._id;
-    await employee.save();
-
-    res.json({ message: 'Employee approved successfully.' });
-  } catch (err) {
-    console.error('Employee Approval Error:', err);
-    res.status(500).json({ error: 'Server error during employee approval.' });
-  }
-});
-
 // Get pending approvals (SuperAdmin for companies)
 router.get('/pending/companies', authUser, authRole(['superadmin']), async (req, res) => {
   try {
@@ -249,18 +230,72 @@ router.get('/pending/companies', authUser, authRole(['superadmin']), async (req,
   }
 });
 
-// Get pending employees (Company)
-router.get('/pending/employees', authUser, authRole(['admin']), async (req, res) => {
+
+// POST /create/employee - Only for Admins
+router.post('/create/employee', authUser, authRole(['admin']), async (req, res) => {
   try {
-    const pendingEmployees = await User.find({ role: 'employee', status: 'pending', companyId: req.user._id }).select('name email createdAt');
-    res.json({ pendingEmployees });
+    const { name, email, password, position } = req.body;
+
+    // Basic field validation
+    if (!name || !email || !password || !position) {
+      return res.status(400).json({ error: 'Name, email, password, and position are required.' });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ error: 'User with this email already exists.' });
+    }
+
+    // Create employee user
+    const employee = new User({
+      name,
+      email,
+      password,
+      role: 'employee',
+      status: 'approved',        // auto-approved
+      emailVerified: true,       // skip email verification
+      companyId: req.user._id,   // link to admin company
+    });
+
+    // Optional: add position if your schema supports it (or store it elsewhere)
+    if (position) {
+      employee.position = position;
+    }
+
+    await employee.save();
+
+    res.status(201).json({
+      message: 'Employee account created successfully.',
+      employee: {
+        id: employee._id,
+        name: employee.name,
+        email: employee.email,
+        role: employee.role,
+        companyId: employee.companyId,
+      }
+    });
+
   } catch (err) {
-    console.error('Get Pending Employees Error:', err);
-    res.status(500).json({ error: 'Server error fetching pending employees.' });
+    console.error('Create Employee Error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-const bcrypt = require('bcrypt');
+// GET /company/employees - Admin can view their employees
+router.get('/company/employees', authUser, authRole(['admin']), async (req, res) => {
+  try {
+    const employees = await User.find({ 
+      role: 'employee',
+      companyId: req.user._id 
+    }).select('-password'); // exclude password
+
+    res.json({ employees });
+  } catch (err) {
+    console.error('Fetch Employees Error:', err.message);
+    res.status(500).json({ error: 'Server error while fetching employees.' });
+  }
+});
 
 // Create superadmin route (use only once, then disable or protect!)
 router.post('/create-superadmin', async (req, res) => {

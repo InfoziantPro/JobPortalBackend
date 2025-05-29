@@ -5,7 +5,7 @@ const { authUser, authRole } = require('../middleware/auth');
 const router = express.Router();
 
 // Post a job (Admin/SuperAdmin only)
-router.post('/postjob', authUser, authRole(['admin', 'superadmin']), async (req, res) => {
+router.post('/postjob', authUser, authRole(['admin', 'superadmin', 'employee']), async (req, res) => {
   try {
     const { title, description, company, location, salaryRange, jobType } = req.body;
 
@@ -47,10 +47,21 @@ router.post('/:id/apply', authUser, async (req, res) => {
   }
 });
 
-// Get all jobs
+// Get all jobs based on role
 router.get('/all', authUser, async (req, res) => {
   try {
-    const jobs = await Job.find({ isActive: true }).populate('postedBy', 'name email');
+    let jobs;
+
+    if (req.user.role === 'user') {
+      // Normal user sees all active jobs
+      jobs = await Job.find({ isActive: true }).populate('postedBy', 'name email');
+    } else if (req.user.role === 'admin' || req.user.role === 'employee') {
+      // Admin/Employee sees only jobs they posted
+      jobs = await Job.find({ isActive: true, postedBy: req.user._id }).populate('postedBy', 'name email');
+    } else {
+      return res.status(403).json({ error: 'Unauthorized role' });
+    }
+
     res.json({ jobs });
   } catch (err) {
     res.status(500).json({ error: 'Failed to load jobs' });
