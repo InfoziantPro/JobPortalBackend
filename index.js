@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: ['http://localhost:5173'], // Adjust for frontend
+  origin: ['http://localhost:5173', 'https://edutech-dev.vercel.app/'], // Adjust for frontend
   credentials: true,
 }));
 
