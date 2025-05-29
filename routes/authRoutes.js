@@ -230,6 +230,16 @@ router.get('/pending/companies', authUser, authRole(['superadmin']), async (req,
   }
 });
 
+// Get approved companies (SuperAdmin view)
+router.get('/approved/companies', authUser, authRole(['superadmin']), async (req, res) => {
+  try {
+    const approvedCompanies = await User.find({ role: 'admin', status: 'approved' }).select('name email createdAt');
+    res.json({ approvedCompanies });
+  } catch (err) {
+    console.error('Get Approved Companies Error:', err);
+    res.status(500).json({ error: 'Server error fetching approved companies.' });
+  }
+});
 
 // POST /create/employee - Only for Admins
 router.post('/create/employee', authUser, authRole(['admin']), async (req, res) => {

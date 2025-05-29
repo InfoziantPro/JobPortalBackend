@@ -52,7 +52,7 @@ router.get('/all', authUser, async (req, res) => {
   try {
     let jobs;
 
-    if (req.user.role === 'user') {
+    if (req.user.role === 'candidate') {
       // Normal user sees all active jobs
       jobs = await Job.find({ isActive: true }).populate('postedBy', 'name email');
     } else if (req.user.role === 'admin' || req.user.role === 'employee') {
