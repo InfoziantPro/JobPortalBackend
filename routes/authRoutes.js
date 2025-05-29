@@ -307,6 +307,48 @@ router.get('/company/employees', authUser, authRole(['admin']), async (req, res)
   }
 });
 
+// PUT /update/employee/:id - Only Admins
+router.put('/update/employee/:id', authUser, authRole(['admin']), async (req, res) => {
+  try {
+    const { name, password, position } = req.body;
+    const employeeId = req.params.id;
+
+    const employee = await User.findOne({ _id: employeeId, role: 'employee', companyId: req.user._id });
+    if (!employee) {
+      return res.status(404).json({ error: 'Employee not found or not part of your company.' });
+    }
+
+    if (name) employee.name = name;
+    if (position) employee.position = position;
+    if (password) employee.password = password; // Hashing will depend on your User model pre-save hook
+
+    await employee.save();
+
+    res.status(200).json({ message: 'Employee updated successfully', employee });
+  } catch (err) {
+    console.error('Update Employee Error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /delete/employee/:id - Only Admins
+router.delete('/delete/employee/:id', authUser, authRole(['admin']), async (req, res) => {
+  try {
+    const employeeId = req.params.id;
+
+    const employee = await User.findOneAndDelete({ _id: employeeId, role: 'employee', companyId: req.user._id });
+    if (!employee) {
+      return res.status(404).json({ error: 'Employee not found or not part of your company.' });
+    }
+
+    res.status(200).json({ message: 'Employee deleted successfully' });
+  } catch (err) {
+    console.error('Delete Employee Error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
 // Create superadmin route (use only once, then disable or protect!)
 router.post('/create-superadmin', async (req, res) => {
   try {

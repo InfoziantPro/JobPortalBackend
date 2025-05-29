@@ -29,6 +29,9 @@ const userSchema = new mongoose.Schema({
   // For employees: company reference
   companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
+  // For employees: their job position (e.g., 'Frontend Developer', 'HR')
+  position: { type: String, trim: true, default: '' },
+
   // For candidates: email verified status
   emailVerified: {
     type: Boolean,
