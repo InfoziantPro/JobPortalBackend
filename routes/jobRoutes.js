@@ -49,7 +49,6 @@ router.post('/:id/apply', authUser, async (req, res) => {
 });
 
 // Get all jobs based on role
-
 router.get('/all', authUser, async (req, res) => {
   try {
     let jobs;
@@ -91,6 +90,63 @@ router.get('/all', authUser, async (req, res) => {
   } catch (err) {
     console.error('Get All Jobs Error:', err);
     res.status(500).json({ error: 'Failed to load jobs' });
+  }
+});
+
+router.put('/:jobId', authUser, authRole(['admin', 'employee']), async (req, res) => {
+  try {
+    const jobId = req.params.jobId;
+    const userId = req.user._id;
+
+    let allowedUserIds = [userId];
+
+    if (req.user.role === 'employee' && req.user.companyId) {
+      allowedUserIds.push(req.user.companyId);
+    }
+
+    const job = await Job.findOne({ _id: jobId, postedBy: { $in: allowedUserIds } });
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found or no permission.' });
+    }
+
+    const { title, description, company, location, jobType, isActive } = req.body;
+
+    if (title !== undefined) job.title = title;
+    if (description !== undefined) job.description = description;
+    if (company !== undefined) job.company = company;
+    if (location !== undefined) job.location = location;
+    if (jobType !== undefined) job.jobType = jobType;
+    if (isActive !== undefined) job.isActive = isActive;
+
+    await job.save();
+    res.status(200).json({ message: 'Job updated successfully.', job });
+  } catch (err) {
+    console.error('Update Job Error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+router.delete('/:jobId', authUser, authRole(['admin', 'employee']), async (req, res) => {
+  try {
+    const jobId = req.params.jobId;
+    const userId = req.user._id;
+
+    let allowedUserIds = [userId];
+    if (req.user.role === 'employee' && req.user.companyId) {
+      allowedUserIds.push(req.user.companyId);
+    }
+
+    const job = await Job.findOne({ _id: jobId, postedBy: { $in: allowedUserIds } });
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found or no permission.' });
+    }
+
+    await job.deleteOne(); // preferred over deprecated .remove()
+
+    res.status(200).json({ message: 'Job deleted successfully.' });
+  } catch (err) {
+    console.error('Delete Job Error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
