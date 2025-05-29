@@ -344,4 +344,33 @@ router.post('/create-superadmin', async (req, res) => {
   }
 });
 
+// Get all approved admins
+router.get('/admins', authUser, authRole(['superadmin']), async (req, res) => {
+  try {
+    const admins = await User.find({ role: 'admin', status: 'approved' })
+      .select('name email createdAt status');
+
+    res.json({ admins });
+  } catch (err) {
+    console.error('Get All Admins Error:', err);
+    res.status(500).json({ error: 'Server error fetching admin list.' });
+  }
+});
+
+// Get all approved users (excluding superadmins)
+router.get('/all', authUser, authRole(['superadmin']), async (req, res) => {
+  try {
+    const users = await User.find({
+      role: { $ne: 'superadmin' },
+      status: 'approved'
+    }).select('name email role status companyId createdAt');
+
+    res.json({ users });
+  } catch (err) {
+    console.error('Get All Users Error:', err);
+    res.status(500).json({ error: 'Server error fetching user list.' });
+  }
+});
+
+
 module.exports = router;

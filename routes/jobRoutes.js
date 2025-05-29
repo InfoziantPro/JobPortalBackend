@@ -1,5 +1,6 @@
 const express = require('express');
 const Job = require('../models/jobs');
+const User = require('../models/User');
 const { authUser, authRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -48,25 +49,51 @@ router.post('/:id/apply', authUser, async (req, res) => {
 });
 
 // Get all jobs based on role
+
 router.get('/all', authUser, async (req, res) => {
   try {
     let jobs;
 
     if (req.user.role === 'candidate') {
-      // Normal user sees all active jobs
-      jobs = await Job.find({ isActive: true }).populate('postedBy', 'name email');
+      // Normal candidate sees all active jobs
+      jobs = await Job.find({ isActive: true }).populate('postedBy', 'name email role');
     } else if (req.user.role === 'admin' || req.user.role === 'employee') {
-      // Admin/Employee sees only jobs they posted
-      jobs = await Job.find({ isActive: true, postedBy: req.user._id }).populate('postedBy', 'name email');
+      let companyId;
+
+      if (req.user.role === 'admin') {
+        // Admin's own _id acts as companyId
+        companyId = req.user._id;
+      } else if (req.user.role === 'employee') {
+        companyId = req.user.companyId;
+      }
+
+      if (!companyId) {
+        return res.status(400).json({ error: 'Company ID not found.' });
+      }
+
+      // Fetch all users who belong to this company + the admin themself
+      const companyUsers = await User.find({
+        $or: [
+          { _id: companyId }, // the admin
+          { companyId }       // employees
+        ]
+      }).select('_id');
+
+      const userIds = companyUsers.map(user => user._id);
+
+      jobs = await Job.find({ isActive: true, postedBy: { $in: userIds } })
+        .populate('postedBy', 'name email role');
     } else {
       return res.status(403).json({ error: 'Unauthorized role' });
     }
 
     res.json({ jobs });
   } catch (err) {
+    console.error('Get All Jobs Error:', err);
     res.status(500).json({ error: 'Failed to load jobs' });
   }
 });
+
 
 // Get current user
 router.get('/me', authUser, (req, res) => {
