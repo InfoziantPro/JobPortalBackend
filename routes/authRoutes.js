@@ -365,9 +365,6 @@ router.post('/create-superadmin', async (req, res) => {
       return res.status(400).json({ error: 'Superadmin already exists with this email' });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
     // Create user with role superadmin
     const superAdmin = new User({
       name,
@@ -386,7 +383,7 @@ router.post('/create-superadmin', async (req, res) => {
   }
 });
 
-// Get all approved admins
+// Get all approved admins - Only for SuperAdmin
 router.get('/admins', authUser, authRole(['superadmin']), async (req, res) => {
   try {
     const admins = await User.find({ role: 'admin', status: 'approved' })
@@ -398,6 +395,48 @@ router.get('/admins', authUser, authRole(['superadmin']), async (req, res) => {
     res.status(500).json({ error: 'Server error fetching admin list.' });
   }
 });
+
+// PUT /admins/:adminId - Superadmin edits an approved admin
+router.put('/admins/:adminId', authUser, authRole(['superadmin']), async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    const admin = await User.findOne({ _id: req.params.adminId, role: 'admin' });
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin not found.' });
+    }
+
+    if (name) admin.name = name;
+    if (email) admin.email = email;
+    if (password) admin.password = password; // This will be hashed automatically via the pre-save hook
+
+    await admin.save();
+
+    res.status(200).json({ message: 'Admin updated successfully.', admin });
+  } catch (err) {
+    console.error('Edit Admin Error:', err.message);
+    res.status(500).json({ error: 'Server error editing admin.' });
+  }
+});
+
+
+// DELETE /admin/:adminId - Superadmin deletes an approved admin
+router.delete('/admins/:adminId', authUser, authRole(['superadmin']), async (req, res) => {
+  try {
+    const admin = await User.findOneAndDelete({ _id: req.params.adminId, role: 'admin' });
+
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin not found or already deleted.' });
+    }
+
+    res.json({ message: 'Admin deleted successfully.' });
+  } catch (err) {
+    console.error('Delete Admin Error:', err);
+    res.status(500).json({ error: 'Server error deleting admin.' });
+  }
+});
+
+
 
 // Get all approved users (excluding superadmins)
 router.get('/all', authUser, authRole(['superadmin']), async (req, res) => {
