@@ -150,7 +150,6 @@ router.delete('/:jobId', authUser, authRole(['admin', 'employee']), async (req, 
   }
 });
 
-
 // Get current user
 router.get('/me', authUser, (req, res) => {
   const { name, email, role } = req.user;
